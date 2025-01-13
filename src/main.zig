@@ -1,10 +1,45 @@
 const std = @import("std");
 const testing = std.testing;
+const print = std.debug.print;
 
 const printError = error{notPrintable};
+const zeroError = error{isZero};
+const argsError = error{
+    wrongWidth,
+    wrongLength,
+};
 
+const possibleParam = enum { @"-w", @"-l", @"-f" };
 pub fn main() !void {
-    // read filename
+    const width = 0;
+    const length = 0;
+
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const argsAlloc = gpa.allocator();
+    defer _ = gpa.deinit();
+
+    const args = try std.process.argsAlloc(argsAlloc);
+    defer std.process.argsFree(argsAlloc, args);
+
+    print("There are {d} args:\n", .{args.len});
+    for (args, 0..) |arg, i| {
+        print("\t{s}\n", .{arg});
+        const param = std.meta.stringToEnum(possibleParam, arg) orelse continue;
+        switch (param) {
+            // find parameter -w to set the width.
+            // if it is unset then use 16
+            .@"-w" => {
+                if (width == 0) width = try args[i + 1] catch argsError.wrongWidth;
+            },
+
+            // find parameter -l to set the word length.
+            // if it is unset then use 1
+            .@"-l" => {
+                if (length == 0) length = try args[i + 1] catch argsError.wrongLengh;
+            },
+            else => continue,
+        }
+    }
 
     // determine your directory
     const cwd = std.fs.cwd();
@@ -29,13 +64,17 @@ pub fn main() !void {
     // 0x00: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod 0d16 or 0x10
     // 0x10: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod
 
-    const lineStop: u8 = 0x10;
+    const lineStop: u8 = try width catch 16;
+    const wordLength: u8 = try length catch 1;
 
-    std.debug.print("@hexdump: ", .{});
+    print("@hexdump: ", .{});
     for (0..lineStop) |i| {
-        std.debug.print("{x:0>2} ", .{i});
+        // print position
+        print("{x:0>2}", .{i});
+        // print end of a word
+        if (i % wordLength == 0) print(" ", .{});
     }
-    std.debug.print("\n", .{});
+    print("\n", .{});
 
     // main file read loop
     // in order to achieve true hexdump i need to
@@ -57,12 +96,12 @@ pub fn main() !void {
             // but not the end of the first line
             // print the printable line and a newline
             if (i != 0x0) {
-                std.debug.print("| {s}\n", .{line});
+                print("| {s}\n", .{line});
                 line = [_]u8{'.'} ** lineStop;
             }
 
             // print the start of a new line and its offest
-            std.debug.print("{x:0>8}: ", .{i});
+            print("{x:0>8}: ", .{i});
             // clear the printable line
         }
 
@@ -70,13 +109,15 @@ pub fn main() !void {
         line[i % lineStop] = printable(char) catch '.';
 
         // print a char hex
-        std.debug.print("{x:0>2} ", .{char});
+        print("{x:0>2}", .{char});
+        // print end of a word
+        if (i % wordLength == 0) print(" ", .{});
 
         if (i == fileSize - 1) {
             for ((i % lineStop)..lineStop - 1) |_| {
-                std.debug.print("   ", .{});
+                print("   ", .{});
             }
-            std.debug.print("| {s}\n", .{line});
+            print("| {s}\n", .{line});
         }
     }
 }
@@ -88,24 +129,14 @@ fn printable(char: u8) !u8 {
     return printError.notPrintable;
 }
 
-//alternative allocator
-//using GeneralPurposeAllocator. you can learn more about allocators in https://youtu.be/vHWiDx_l4V0
+fn notZero(numb: u8) !u8 {
+    if (numb > 0) return numb;
+    return zeroError.isZero;
+}
 
-//const std = @import("std");
-
-//pub fn main() !void {
-//    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-//    defer _ = gpa.deinit();
-//    const allocator = &gpa.allocator;
-//    const args = try std.process.argsAlloc(allocator);
-//    defer std.process.argsFree(allocator, args);
-//    const file = try std.fs.cwd().openFile(args[1], .{});
-//    const file_content = try file.readToEndAlloc(allocator, 1024 * 1024); // 1MB max read size
-//    defer allocator.free(file_content);
-//    std.debug.print("{s}", .{file_content});
-//}
-
-// TESTS
+fn readReal(str: []const u8) void {
+    print("{str}", .{str});
+}
 
 test "modulo" {
     try testing.expect(0x10 % 0x10 == 0);
@@ -127,3 +158,53 @@ test "load_string" {
 
     try testing.expect(line[0] == char);
 }
+
+// test to see how args are parsed actually
+test "args test" {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const allocator = gpa.allocator();
+    defer _ = gpa.deinit();
+
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
+
+    print("args test:\nThere are {d} args:\n", .{args.len});
+    for (args) |arg| {
+        print("\t{s}\n", .{arg});
+    }
+}
+
+test "zero error test" {
+    print("notZero:\n", .{});
+    print("\ttest: {any}\n", .{notZero(4)});
+    try testing.expectEqual(3, notZero(3));
+
+    print("\ttest: {any}\n", .{notZero(0)});
+    try testing.expectError(zeroError.isZero, notZero(0));
+}
+
+test "param val to u8" {
+    print("param val to u8:\n", .{});
+    print("\t", .{});
+    readReal("77");
+    print("\n", .{});
+}
+
+//alternative allocator
+//using GeneralPurposeAllocator. you can learn more about allocators in https://youtu.be/vHWiDx_l4V0
+
+//const std = @import("std");
+
+//pub fn main() !void {
+//    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+//    defer _ = gpa.deinit();
+//    const allocator = &gpa.allocator;
+//    const args = try std.process.argsAlloc(allocator);
+//    defer std.process.argsFree(allocator, args);
+//    const file = try std.fs.cwd().openFile(args[1], .{});
+//    const file_content = try file.readToEndAlloc(allocator, 1024 * 1024); // 1MB max read size
+//    defer allocator.free(file_content);
+//    std.debug.print("{s}", .{file_content});
+//}
+
+// TESTS
