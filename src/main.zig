@@ -11,15 +11,17 @@ const argsError = error{
 
 const possibleParam = enum { @"-w", @"-l", @"-f" };
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const argsAlloc = gpa.allocator();
-    defer _ = gpa.deinit();
+    // alloc buffer
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
 
-    const args = try std.process.argsAlloc(argsAlloc);
-    defer std.process.argsFree(argsAlloc, args);
+    const allocator = arena.allocator();
 
-    var lineStop: u8 = 0;
-    var wordLength: u8 = 0;
+    const args = try std.process.argsAlloc(allocator);
+    defer std.process.argsFree(allocator, args);
+
+    var lineStop: u8 = 16;
+    var wordLength: u8 = 4;
 
     print("There are {d} args:\n", .{args.len});
     for (args, 0..) |arg, i| {
@@ -48,12 +50,6 @@ pub fn main() !void {
 
     const fileSize = (try file.stat()).size;
 
-    // alloc buffer
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-
-    const allocator = arena.allocator();
-
     const buffer = try allocator.alloc(u8, fileSize);
 
     // read into an array
@@ -69,7 +65,8 @@ pub fn main() !void {
         // print position
         print("{x:0>2}", .{i});
         // print end of a word
-        if (i % wordLength == 0) print(" ", .{});
+        if (i % wordLength == wordLength - 1)
+            print(" ", .{});
     }
     print("\n", .{});
 
@@ -116,11 +113,12 @@ pub fn main() !void {
         // print a char hex
         print("{x:0>2}", .{char});
         // print end of a word
-        if (i % wordLength == 0) print(" ", .{});
+        if (i % wordLength == wordLength - 1 or i == fileSize - 1) print(" ", .{});
 
         if (i == fileSize - 1) {
-            for ((i % lineStop)..lineStop - 1) |_| {
-                print("   ", .{});
+            for (i..(lineStop % fileSize + fileSize) - 2) |t| {
+                print("  ", .{});
+                if (t % wordLength == wordLength - 1) print(" ", .{});
             }
             print("| {s}\n", .{line});
         }
