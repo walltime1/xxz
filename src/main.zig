@@ -11,15 +11,15 @@ const argsError = error{
 
 const possibleParam = enum { @"-w", @"-l", @"-f" };
 pub fn main() !void {
-    const width = 0;
-    const length = 0;
-
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const argsAlloc = gpa.allocator();
     defer _ = gpa.deinit();
 
     const args = try std.process.argsAlloc(argsAlloc);
     defer std.process.argsFree(argsAlloc, args);
+
+    var lineStop: u8 = 0;
+    var wordLength: u8 = 0;
 
     print("There are {d} args:\n", .{args.len});
     for (args, 0..) |arg, i| {
@@ -29,13 +29,13 @@ pub fn main() !void {
             // find parameter -w to set the width.
             // if it is unset then use 16
             .@"-w" => {
-                if (width == 0) width = try args[i + 1] catch argsError.wrongWidth;
+                lineStop = readReal(args[i + 1], lineStop) catch argsError.wrongWidth;
             },
 
             // find parameter -l to set the word length.
             // if it is unset then use 1
             .@"-l" => {
-                if (length == 0) length = try args[i + 1] catch argsError.wrongLengh;
+                wordLength = readReal(args[i + 1], wordLength) catch argsError.wrongLengh;
             },
             else => continue,
         }
@@ -64,9 +64,6 @@ pub fn main() !void {
     // 0x00: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod 0d16 or 0x10
     // 0x10: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod
 
-    const lineStop: u8 = try width catch 16;
-    const wordLength: u8 = try length catch 1;
-
     print("@hexdump: ", .{});
     for (0..lineStop) |i| {
         // print position
@@ -81,7 +78,13 @@ pub fn main() !void {
     // create a string and populate it with
     // possible printable characters
 
-    var line: [lineStop]u8 = [_]u8{'.'} ** lineStop;
+    // var line: = [_]u8{'.'} ** lineStop;
+    var line = try allocator.alloc(u8, lineStop);
+
+    for (line, 0..) |_, place| {
+        line[place] = '.';
+    }
+
     // var content: [64]u8 = [_]u8{'A'} ** 64;
 
     // loop to the end of the file size
@@ -97,7 +100,9 @@ pub fn main() !void {
             // print the printable line and a newline
             if (i != 0x0) {
                 print("| {s}\n", .{line});
-                line = [_]u8{'.'} ** lineStop;
+                for (line, 0..) |_, place| {
+                    line[place] = '.';
+                }
             }
 
             // print the start of a new line and its offest
@@ -134,8 +139,9 @@ fn notZero(numb: u8) !u8 {
     return zeroError.isZero;
 }
 
-fn readReal(str: []const u8) void {
-    print("{str}", .{str});
+fn readReal(str: []const u8, backup: u8) !u8 {
+    const retVal: u8 = std.fmt.parseUnsigned(u8, str, 10) catch backup;
+    return retVal;
 }
 
 test "modulo" {
@@ -186,7 +192,8 @@ test "zero error test" {
 test "param val to u8" {
     print("param val to u8:\n", .{});
     print("\t", .{});
-    readReal("77");
+    try testing.expectEqual(readReal("11", 1), 11);
+    try testing.expectEqual(readReal("1111", 0), 0);
     print("\n", .{});
 }
 
