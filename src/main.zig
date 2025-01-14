@@ -7,6 +7,7 @@ const zeroError = error{isZero};
 const argsError = error{
     wrongWidth,
     wrongLength,
+    wrongFileName,
 };
 
 const possibleParam = enum { @"-w", @"-l", @"-f" };
@@ -17,35 +18,38 @@ pub fn main() !void {
 
     const allocator = arena.allocator();
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    var args = std.process.args();
 
     var lineStop: u8 = 16;
     var wordLength: u8 = 4;
+    var fileNamePointer: [:0]const u8 = undefined;
 
-    print("There are {d} args:\n", .{args.len});
-    for (args, 0..) |arg, i| {
-        print("\t{s}\n", .{arg});
+    while (args.next()) |arg| {
         const param = std.meta.stringToEnum(possibleParam, arg) orelse continue;
         switch (param) {
             // find parameter -w to set the width.
             // if it is unset then use 16
             .@"-w" => {
-                lineStop = readReal(args[i + 1], lineStop) catch argsError.wrongWidth;
+                lineStop = readReal(args.next() orelse break, lineStop) catch argsError.wrongWidth;
             },
 
             // find parameter -l to set the word length.
             // if it is unset then use 1
             .@"-l" => {
-                wordLength = readReal(args[i + 1], wordLength) catch argsError.wrongLengh;
+                wordLength = readReal(args.next() orelse break, wordLength) catch argsError.wrongLengh;
             },
-            else => continue,
+
+            // read file name
+            .@"-f" => {
+                fileNamePointer = args.next() orelse unreachable;
+            },
+            //else => continue,
         }
     }
 
     // determine your directory
     const cwd = std.fs.cwd();
-    const file = try cwd.openFile("test.txt", .{});
+    const file = try cwd.openFile(fileNamePointer, .{});
     defer file.close();
 
     const fileSize = (try file.stat()).size;
@@ -174,6 +178,14 @@ test "args test" {
 
     print("args test:\nThere are {d} args:\n", .{args.len});
     for (args) |arg| {
+        print("\t{s}\n", .{arg});
+    }
+}
+
+test "args test 2" {
+    var args = std.process.args();
+    print("args test 2:\n", .{});
+    while (args.next()) |arg| {
         print("\t{s}\n", .{arg});
     }
 }
