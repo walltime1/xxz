@@ -7,8 +7,10 @@ Milestones:
     - Basic hexdump formatter [x]
     - Read command line params [x]
     - Handle errors when suppiled params are missing/broken []
+    - Read data directly from stdin []
   - Going deeper []
     - Learn zig build system []
+      - Note: for now this seems pretty straingtforward so I will try to move some function to external zig file and then import it back to the original code (Most likely I will try to implement my own args reading and parsing module)
     - Coloured output []
   - Final steps []
     - Support for both -p val amd -p=val command line param formats [] 
