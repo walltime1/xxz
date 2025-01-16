@@ -22,7 +22,7 @@ pub fn main() !void {
 
     var lineStop: u8 = 16;
     var wordLength: u8 = 4;
-    var fileNamePointer: [:0]const u8 = undefined;
+    var fileNamePointer: [:0]const u8 = "";
 
     while (args.next()) |arg| {
         const param = std.meta.stringToEnum(possibleParam, arg) orelse continue;
@@ -30,25 +30,32 @@ pub fn main() !void {
             // find parameter -w to set the width.
             // if it is unset then use 16
             .@"-w" => {
-                lineStop = readReal(args.next() orelse break, lineStop) catch argsError.wrongWidth;
+                const tempRead: [:0]const u8 = args.next() orelse break;
+                lineStop = readReal(tempRead, lineStop) catch argsError.wrongWidth;
             },
 
             // find parameter -l to set the word length.
             // if it is unset then use 1
             .@"-l" => {
-                wordLength = readReal(args.next() orelse break, wordLength) catch argsError.wrongLengh;
+                const tempRead: [:0]const u8 = args.next() orelse break;
+                wordLength = readReal(tempRead, wordLength) catch argsError.wrongLengh;
             },
 
             // read file name
             .@"-f" => {
-                fileNamePointer = args.next() orelse unreachable;
+                const tempRead: [:0]const u8 = args.next() orelse break;
+                fileNamePointer = tempRead;
             },
             //else => continue,
         }
     }
 
+    if (fileNamePointer.len == 0) return argsError.wrongFileName;
+
     // determine your directory
     const cwd = std.fs.cwd();
+
+    // this is optional
     const file = try cwd.openFile(fileNamePointer, .{});
     defer file.close();
 
@@ -64,7 +71,7 @@ pub fn main() !void {
     // 0x00: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod 0d16 or 0x10
     // 0x10: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod
 
-    print("@hexdump: ", .{});
+    print("\n@hexdump: ", .{});
     for (0..lineStop) |i| {
         // print position
         print("{x:0>2}", .{i});
@@ -143,6 +150,10 @@ fn notZero(numb: u8) !u8 {
 
 fn readReal(str: []const u8, backup: u8) !u8 {
     const retVal: u8 = std.fmt.parseUnsigned(u8, str, 10) catch backup;
+    if (retVal <= 0) {
+        std.debug.print("DEBUG: [{d}] is less than 1, falling back to {d}!\n", .{ retVal, backup });
+        return backup;
+    }
     return retVal;
 }
 
