@@ -70,7 +70,37 @@ pub fn main() !void {
     // how we need to add N columns
     // 0x00: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod 0d16 or 0x10
     // 0x10: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod
+    printHeader(lineStop, wordLength);
 
+    // main file read loop
+    // in order to achieve true hexdump i need to
+    // create a string and populate it with
+    // possible printable characters
+    try printHexdump(buffer, lineStop, wordLength);
+}
+
+fn printable(char: u8) !u8 {
+    // if char in range return char
+    // else return error
+    if (char > 31 and char != 127) return char;
+    return printError.notPrintable;
+}
+
+fn notZero(numb: u8) !u8 {
+    if (numb > 0) return numb;
+    return zeroError.isZero;
+}
+
+fn readReal(str: []const u8, backup: u8) !u8 {
+    const retVal: u8 = std.fmt.parseUnsigned(u8, str, 10) catch backup;
+    if (retVal <= 0) {
+        std.debug.print("DEBUG: [{d}] is less than 1, falling back to {d}!\n", .{ retVal, backup });
+        return backup;
+    }
+    return retVal;
+}
+
+fn printHeader(lineStop: u8, wordLength: u8) void {
     print("\n@hexdump: ", .{});
     for (0..lineStop) |i| {
         // print position
@@ -80,23 +110,23 @@ pub fn main() !void {
             print(" ", .{});
     }
     print("\n", .{});
+}
 
-    // main file read loop
-    // in order to achieve true hexdump i need to
-    // create a string and populate it with
-    // possible printable characters
-
+fn printHexdump(buffer: []u8, lineStop: u8, wordLength: u8) !void {
     // var line: = [_]u8{'.'} ** lineStop;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
+    const allocator = arena.allocator();
     var line = try allocator.alloc(u8, lineStop);
 
     for (line, 0..) |_, place| {
         line[place] = '.';
     }
-
     // var content: [64]u8 = [_]u8{'A'} ** 64;
 
     // loop to the end of the file size
-    for (0..fileSize) |i| {
+    for (0..buffer.len) |i| {
 
         // read one character
         const char = buffer[i];
@@ -124,10 +154,10 @@ pub fn main() !void {
         // print a char hex
         print("{x:0>2}", .{char});
         // print end of a word
-        if (i % wordLength == wordLength - 1 or i == fileSize - 1) print(" ", .{});
+        if (i % wordLength == wordLength - 1 or i == buffer.len - 1) print(" ", .{});
 
-        if (i == fileSize - 1) {
-            for (i..(lineStop % fileSize + fileSize) - 2) |t| {
+        if (i == buffer.len - 1) {
+            for (i..(lineStop % buffer.len + buffer.len) - 2) |t| {
                 print("  ", .{});
                 if (t % wordLength == wordLength - 1) print(" ", .{});
             }
@@ -136,26 +166,7 @@ pub fn main() !void {
     }
 }
 
-fn printable(char: u8) !u8 {
-    // if char in range return char
-    // else return error
-    if (char > 31 and char != 127) return char;
-    return printError.notPrintable;
-}
-
-fn notZero(numb: u8) !u8 {
-    if (numb > 0) return numb;
-    return zeroError.isZero;
-}
-
-fn readReal(str: []const u8, backup: u8) !u8 {
-    const retVal: u8 = std.fmt.parseUnsigned(u8, str, 10) catch backup;
-    if (retVal <= 0) {
-        std.debug.print("DEBUG: [{d}] is less than 1, falling back to {d}!\n", .{ retVal, backup });
-        return backup;
-    }
-    return retVal;
-}
+fn processExample1() void {}
 
 test "modulo" {
     try testing.expect(0x10 % 0x10 == 0);
@@ -218,6 +229,11 @@ test "param val to u8" {
     print("\n", .{});
 }
 
+test "printHeader" {
+    printHeader(4, 1);
+    printHeader(32, 4);
+    printHeader(16, 2);
+}
 //alternative allocator
 //using GeneralPurposeAllocator. you can learn more about allocators in https://youtu.be/vHWiDx_l4V0
 
