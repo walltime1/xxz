@@ -18,6 +18,8 @@ pub fn main() !void {
 
     const allocator = arena.allocator();
 
+    //_ = allocator;
+
     var args = std.process.args();
 
     var lineStop: u8 = 16;
@@ -59,24 +61,37 @@ pub fn main() !void {
     const file = try cwd.openFile(fileNamePointer, .{});
     defer file.close();
 
-    const fileSize = (try file.stat()).size;
+    var bufRead = std.io.bufferedReader(file.reader());
 
-    const buffer = try allocator.alloc(u8, fileSize);
+    //var buffer: [1024]u8 = undefined;
+    const buffer = try allocator.alloc(u8, lineStop);
 
-    // read into an array
-    try file.reader().readNoEof(buffer);
-
-    // print file content as a series of hexes
-    // how we need to add N columns
-    // 0x00: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod 0d16 or 0x10
-    // 0x10: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod
     printHeader(lineStop, wordLength);
 
-    // main file read loop
-    // in order to achieve true hexdump i need to
-    // create a string and populate it with
-    // possible printable characters
-    try printHexdump(buffer, lineStop, wordLength);
+    var offset: i64 = 0;
+
+    while (true) {
+        // read into an array
+        const len = try bufRead.reader().readAll(buffer);
+
+        if (len == 0) break;
+
+        // print file content as a series of hexes
+        // how we need to add N columns
+        // 0x00: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod 0d16 or 0x10
+        // 0x10: 0 1 2 3 4 5 6 7 8 9 a b c d e f mod
+
+        // main file read loop
+        // in order to achieve true hexdump i need to
+        // create a string and populate it with
+        // possible printable characters
+        //try printHexdump1(buffer, lineStop, wordLength);
+        try printHexdump2(buffer, wordLength, offset);
+        offset += @intCast(buffer.len);
+    }
+
+    // last read;
+
 }
 
 fn printable(char: u8) !u8 {
@@ -112,58 +127,19 @@ fn printHeader(lineStop: u8, wordLength: u8) void {
     print("\n", .{});
 }
 
-fn printHexdump(buffer: []const u8, lineStop: u8, wordLength: u8) !void {
-    // var line: = [_]u8{'.'} ** lineStop;
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
+fn printHexdump2(buffer: []const u8, wordLength: u8, offset: i64) !void {
+    print("{x:0>8}: ", .{offset});
 
-    const allocator = arena.allocator();
-    var line = try allocator.alloc(u8, lineStop);
-
-    for (line, 0..) |_, place| {
-        line[place] = '.';
-    }
-    // var content: [64]u8 = [_]u8{'A'} ** 64;
-
-    // loop to the end of the file size
     for (0..buffer.len) |i| {
-
-        // read one character
-        const char = buffer[i];
-
-        // when we reach the end of a line
-        if (i % lineStop == 0) {
-
-            // but not the end of the first line
-            // print the printable line and a newline
-            if (i != 0x0) {
-                print("| {s}\n", .{line});
-                for (line, 0..) |_, place| {
-                    line[place] = '.';
-                }
-            }
-
-            // print the start of a new line and its offest
-            print("{x:0>8}: ", .{i});
-            // clear the printable line
-        }
-
-        // if char is printable add it to the end string
-        line[i % lineStop] = printable(char) catch '.';
-
-        // print a char hex
-        print("{x:0>2}", .{char});
-        // print end of a word
-        if (i % wordLength == wordLength - 1 or i == buffer.len - 1) print(" ", .{});
-
-        if (i == buffer.len - 1) {
-            for (i..(lineStop % buffer.len + buffer.len) - 2) |t| {
-                print("  ", .{});
-                if (t % wordLength == wordLength - 1) print(" ", .{});
-            }
-            print("| {s}\n", .{line});
-        }
+        print("{x:0>2}", .{buffer[i]});
+        if (i % wordLength == wordLength - 1) print(" ", .{});
     }
+
+    for (0..buffer.len) |i| {
+        const res = printable(buffer[i]) catch '.';
+        print("{c}", .{res});
+    }
+    print("\n", .{});
 }
 
 fn processExample1() void {}
@@ -237,11 +213,10 @@ test "printHeader" {
 
 test "print Hex" {
     // difference  between []u8 []const u8?
-    const text: []const u8 = "TExt  nfbkea;r nrg;alkrgn qe;lrgknrlgenrlgk nerg ";
+    const text: []const u8 = "12345678";
     //const text: []u8 = &txt;
-    try printHexdump(text, 16, 4);
-    try printHexdump(text, 4, 1);
-    try printHexdump(text, 8, 2);
+    try printHexdump2(text, 1, 4);
+    try printHexdump2(text, 2, 4);
 }
 //alternative allocator
 //using GeneralPurposeAllocator. you can learn more about allocators in https://youtu.be/vHWiDx_l4V0
