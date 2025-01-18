@@ -112,7 +112,7 @@ fn printHeader(lineStop: u8, wordLength: u8) void {
     print("\n", .{});
 }
 
-fn printHexdump(buffer: []u8, lineStop: u8, wordLength: u8) !void {
+fn printHexdump(buffer: []const u8, lineStop: u8, wordLength: u8) !void {
     // var line: = [_]u8{'.'} ** lineStop;
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -233,6 +233,15 @@ test "printHeader" {
     printHeader(4, 1);
     printHeader(32, 4);
     printHeader(16, 2);
+}
+
+test "print Hex" {
+    // difference  between []u8 []const u8?
+    const text: []const u8 = "TExt  nfbkea;r nrg;alkrgn qe;lrgknrlgenrlgk nerg ";
+    //const text: []u8 = &txt;
+    try printHexdump(text, 16, 4);
+    try printHexdump(text, 4, 1);
+    try printHexdump(text, 8, 2);
 }
 //alternative allocator
 //using GeneralPurposeAllocator. you can learn more about allocators in https://youtu.be/vHWiDx_l4V0
