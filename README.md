@@ -7,8 +7,10 @@ Milestones:
   - [x] Basic hexdump formatter;
   - [x] Read command line params;
   - [x] Handle errors when suppiled params are missing/broken;
-  - [] Read data directly from stdin;
-    - Reading data from stdin is a tricky one, this forced me to think that reading the whole file into heap is a silly idea and impement one common approach to read N bytes at a time, printing them in the hexdump and then proceed with reading next N bytes till my data is ended. This should allow me to keep memory usage low and whith would be a common approach for both stdin and file read;
+  - [x] Read data directly from stdin;
+    - if there is a valid filename a file will be read;
+    - if there is none and there is a data piped the data will be read;
+    - otherwise program will be stuck vaiting for an input;
 - [] Going deeper;
   - [] Learn zig build system;
     - [] Note: for now this seems pretty straingtforward so I will try to move some function to external zig file and then import it back to the original code (Most likely I will try to implement my own args reading and parsing module);

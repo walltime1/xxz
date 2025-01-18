@@ -52,16 +52,16 @@ pub fn main() !void {
         }
     }
 
-    if (fileNamePointer.len == 0) return argsError.wrongFileName;
+    var in = std.io.getStdIn();
+    if (fileNamePointer.len != 0) {
+        const cwd = std.fs.cwd();
+        in = try cwd.openFile(fileNamePointer, .{});
+    }
+    defer in.close();
 
-    // determine your directory
-    const cwd = std.fs.cwd();
+    //const in = std.io.getStdIn();
 
-    // this is optional
-    const file = try cwd.openFile(fileNamePointer, .{});
-    defer file.close();
-
-    var bufRead = std.io.bufferedReader(file.reader());
+    var bufRead = std.io.bufferedReader(in.reader());
 
     //var buffer: [1024]u8 = undefined;
     const buffer = try allocator.alloc(u8, lineStop);
@@ -97,7 +97,7 @@ pub fn main() !void {
 fn printable(char: u8) !u8 {
     // if char in range return char
     // else return error
-    if (char > 31 and char != 127) return char;
+    if (char > 31 and char < 127) return char;
     return printError.notPrintable;
 }
 
