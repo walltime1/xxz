@@ -72,7 +72,7 @@ pub fn main() !void {
     var bufRead = std.io.bufferedReader(in.reader());
 
     //var buffer: [1024]u8 = undefined;
-    const buffer = try allocator.alloc(u8, lineStop);
+    const buffer = try allocator.alloc(u8, 64);
 
     printHeader(lineStop, wordLength);
 
@@ -81,9 +81,7 @@ pub fn main() !void {
     // main file read loop
     while (true) {
         // read into an array
-        const len = try bufRead.reader().readAll(buffer);
-
-        if (len == 0) break;
+        const bytesRead = try bufRead.reader().readAtLeast(buffer, lineStop);
 
         // print file content as a series of hexes
         // how we need to add N columns
@@ -93,8 +91,10 @@ pub fn main() !void {
         // in order to achieve true hexdump i need to
         // create a string and populate it with
         // possible printable characters
-        try printHexdump2(buffer, wordLength, offset);
+        try printHexdump2(buffer, bytesRead, wordLength, offset);
         offset += @intCast(buffer.len);
+
+        if (bytesRead != lineStop) break;
     }
 
     // last read;
@@ -134,16 +134,25 @@ fn printHeader(lineStop: u8, wordLength: u8) void {
     print("\n", .{});
 }
 
-fn printHexdump2(buffer: []const u8, wordLength: u8, offset: i64) !void {
+fn printHexdump2(buffer: []const u8, bufferLen: usize, wordLength: u8, offset: i64) !void {
     print("{x:0>8}: ", .{offset});
 
-    for (0..buffer.len) |i| {
-        print("{x:0>2}", .{buffer[i]});
+    // Print the hex values
+    for (0..bufferLen) |i| {
+        const byte = buffer[i];
+        print("{x:0>2}", .{byte});
         if (i % wordLength == wordLength - 1) print(" ", .{});
     }
-
-    for (0..buffer.len) |i| {
-        const res = printable(buffer[i]) catch '.';
+    //fill the gap if read less bytes than the buffer
+    for (bufferLen..buffer.len) |i| {
+        print("  ", .{});
+        if (i % wordLength == wordLength - 1) print(" ", .{});
+    }
+    print(" :", .{});
+    // Print the printable characters
+    for (0..bufferLen) |i| {
+        const byte = buffer[i];
+        const res = try printable(byte);
         print("{c}", .{res});
     }
     print("\n", .{});
@@ -217,8 +226,9 @@ test "print Hex" {
     // difference  between []u8 []const u8?
     const text: []const u8 = "12345678";
     //const text: []u8 = &txt;
-    try printHexdump2(text, 1, 4);
-    try printHexdump2(text, 2, 4);
+    try printHexdump2(text, 8, 1, 4);
+    try printHexdump2(text, 3, 1, 4);
+    try printHexdump2(text, 8, 2, 4);
 }
 //alternative allocator
 //using GeneralPurposeAllocator. you can learn more about allocators in https://youtu.be/vHWiDx_l4V0
