@@ -91,7 +91,7 @@ pub fn main() !void {
         // in order to achieve true hexdump i need to
         // create a string and populate it with
         // possible printable characters
-        try printHexdump2(buffer, bytesRead, wordLength, offset);
+        try printHexdump3(buffer[0..bytesRead], wordLength, offset);
         offset += @intCast(buffer.len);
 
         if (bytesRead != lineStop) break;
@@ -151,6 +151,27 @@ fn printHexdump2(buffer: []const u8, bufferLen: usize, wordLength: u8, offset: i
     print(" :", .{});
     // Print the printable characters
     for (0..bufferLen) |i| {
+        const byte = buffer[i];
+        const res: u8 = printable(byte) catch '.';
+        print("{c}", .{res});
+    }
+    print("\n", .{});
+}
+
+fn printHexdump3(buffer: []const u8, wordLength: u8, offset: i64) !void {
+    print("{x:0>8}: ", .{offset});
+
+    // Print the hex values
+    for (0..buffer.len) |i| {
+        const byte = buffer[i];
+        print("{x:0>2}", .{byte});
+        if (i % wordLength == wordLength - 1) print(" ", .{});
+    }
+    //fill the gap if read less bytes than the buffer
+
+    print(" :", .{});
+    // Print the printable characters
+    for (0..buffer.len) |i| {
         const byte = buffer[i];
         const res: u8 = printable(byte) catch '.';
         print("{c}", .{res});
