@@ -72,7 +72,7 @@ pub fn main() !void {
     var bufRead = std.io.bufferedReader(in.reader());
 
     //var buffer: [1024]u8 = undefined;
-    const buffer = try allocator.alloc(u8, 64);
+    const buffer = try allocator.alloc(u8, lineStop);
 
     printHeader(lineStop, wordLength);
 
@@ -152,7 +152,7 @@ fn printHexdump2(buffer: []const u8, bufferLen: usize, wordLength: u8, offset: i
     // Print the printable characters
     for (0..bufferLen) |i| {
         const byte = buffer[i];
-        const res = try printable(byte);
+        const res: u8 = printable(byte) catch '.';
         print("{c}", .{res});
     }
     print("\n", .{});
