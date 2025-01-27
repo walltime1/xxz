@@ -34,7 +34,7 @@ pub fn main() !void {
             .@"-w" => {
                 if (i < args.len - 1) {
                     const tempRead = args[i + 1];
-                    lineStop = readReal(tempRead, lineStop) catch argsError.wrongWidth;
+                    lineStop = readReal(tempRead, lineStop);
                 }
             },
 
@@ -43,7 +43,7 @@ pub fn main() !void {
             .@"-l" => {
                 if (i < args.len - 1) {
                     const tempRead: [:0]const u8 = args[i + 1];
-                    wordLength = readReal(tempRead, wordLength) catch argsError.wrongLengh;
+                    wordLength = readReal(tempRead, wordLength);
                 }
             },
 
@@ -91,7 +91,7 @@ pub fn main() !void {
         // in order to achieve true hexdump i need to
         // create a string and populate it with
         // possible printable characters
-        try printHexdump3(buffer[0..bytesRead], wordLength, offset);
+        try printHexdump(buffer[0..bytesRead], wordLength, offset);
         offset += @intCast(buffer.len);
 
         if (bytesRead != lineStop) break;
@@ -108,12 +108,12 @@ fn printable(char: u8) !u8 {
     return printError.notPrintable;
 }
 
-fn notZero(numb: u8) !u8 {
+fn notZero(comptime numb: u8) !u8 {
     if (numb > 0) return numb;
     return zeroError.isZero;
 }
 
-fn readReal(str: []const u8, backup: u8) !u8 {
+fn readReal(str: []const u8, backup: u8) u8 {
     const retVal: u8 = std.fmt.parseUnsigned(u8, str, 10) catch backup;
     if (retVal <= 0) {
         std.debug.print("DEBUG: [{d}] is less than 1, falling back to {d}!\n", .{ retVal, backup });
@@ -134,49 +134,21 @@ fn printHeader(lineStop: u8, wordLength: u8) void {
     print("\n", .{});
 }
 
-fn printHexdump2(buffer: []const u8, bufferLen: usize, wordLength: u8, offset: i64) !void {
+fn printHexdump(buffer: []const u8, wordLength: u8, offset: i64) !void {
     print("{x:0>8}: ", .{offset});
 
-    // Print the hex values
-    for (0..bufferLen) |i| {
-        const byte = buffer[i];
-        print("{x:0>2}", .{byte});
-        if (i % wordLength == wordLength - 1) print(" ", .{});
-    }
-    //fill the gap if read less bytes than the buffer
-    for (bufferLen..buffer.len) |i| {
-        print("  ", .{});
-        if (i % wordLength == wordLength - 1) print(" ", .{});
-    }
-    print(" :", .{});
-    // Print the printable characters
-    for (0..bufferLen) |i| {
-        const byte = buffer[i];
-        const res: u8 = printable(byte) catch '.';
-        print("{c}", .{res});
-    }
-    print("\n", .{});
-}
-
-fn printHexdump3(buffer: []const u8, wordLength: u8, offset: i64) !void {
-    print("{x:0>8}: ", .{offset});
-
+    // variable for a printable string
+    var printableStr: [0xff]u8 = undefined;
     // Print the hex values
     for (0..buffer.len) |i| {
         const byte = buffer[i];
         print("{x:0>2}", .{byte});
+        printableStr[i] = printable(byte) catch '.';
         if (i % wordLength == wordLength - 1) print(" ", .{});
     }
     //fill the gap if read less bytes than the buffer
 
-    print(" :", .{});
-    // Print the printable characters
-    for (0..buffer.len) |i| {
-        const byte = buffer[i];
-        const res: u8 = printable(byte) catch '.';
-        print("{c}", .{res});
-    }
-    print("\n", .{});
+    print(" :{s}\n", .{printableStr[0..buffer.len]});
 }
 
 fn processExample1() void {}
@@ -243,13 +215,15 @@ test "printHeader" {
     printHeader(16, 2);
 }
 
-test "print Hex" {
-    // difference  between []u8 []const u8?
-    const text: []const u8 = "12345678";
-    //const text: []u8 = &txt;
-    try printHexdump2(text, 8, 1, 4);
-    try printHexdump2(text, 3, 1, 4);
-    try printHexdump2(text, 8, 2, 4);
-}
 //alternative allocator
 //using GeneralPurposeAllocator. you can learn more about allocators in https://youtu.be/vHWiDx_l4V0
+
+// https://zig.news/xq/cool-zig-patterns-comptime-string-interning-3558
+fn internString(comptime str: []const u8) []const u8 {
+    return internStringBuffer(str.len, str[0..str.len].*);
+}
+
+fn internStringBuffer(comptime len: comptime_int, comptime items: [len]u8) []const u8 {
+    comptime var storage: [len]u8 = items;
+    return &storage;
+}
