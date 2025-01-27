@@ -34,7 +34,7 @@ pub fn main() !void {
             .@"-w" => {
                 if (i < args.len - 1) {
                     const tempRead = args[i + 1];
-                    lineStop = readReal(tempRead, lineStop);
+                    lineStop = std.fmt.parseUnsigned(u8, tempRead, 10) catch lineStop;
                 }
             },
 
@@ -43,7 +43,7 @@ pub fn main() !void {
             .@"-l" => {
                 if (i < args.len - 1) {
                     const tempRead: [:0]const u8 = args[i + 1];
-                    wordLength = readReal(tempRead, wordLength);
+                    wordLength = std.fmt.parseUnsigned(u8, tempRead, 10) catch wordLength;
                 }
             },
 
@@ -73,8 +73,6 @@ pub fn main() !void {
 
     //var buffer: [1024]u8 = undefined;
     const buffer = try allocator.alloc(u8, lineStop);
-
-    printHeader(lineStop, wordLength);
 
     var offset: i64 = 0;
 
@@ -111,27 +109,6 @@ fn printable(char: u8) !u8 {
 fn notZero(comptime numb: u8) !u8 {
     if (numb > 0) return numb;
     return zeroError.isZero;
-}
-
-fn readReal(str: []const u8, backup: u8) u8 {
-    const retVal: u8 = std.fmt.parseUnsigned(u8, str, 10) catch backup;
-    if (retVal <= 0) {
-        std.debug.print("DEBUG: [{d}] is less than 1, falling back to {d}!\n", .{ retVal, backup });
-        return backup;
-    }
-    return retVal;
-}
-
-fn printHeader(lineStop: u8, wordLength: u8) void {
-    print("\n@hexdump: ", .{});
-    for (0..lineStop) |i| {
-        // print position
-        print("{x:0>2}", .{i});
-        // print end of a word
-        if (i % wordLength == wordLength - 1)
-            print(" ", .{});
-    }
-    print("\n", .{});
 }
 
 fn printHexdump(buffer: []const u8, wordLength: u8, offset: i64) !void {
@@ -201,29 +178,15 @@ test "zero error test" {
     try testing.expectError(zeroError.isZero, notZero(0));
 }
 
-test "param val to u8" {
-    print("param val to u8:\n", .{});
-    print("\t", .{});
-    try testing.expectEqual(readReal("11", 1), 11);
-    try testing.expectEqual(readReal("1111", 0), 0);
-    print("\n", .{});
-}
-
-test "printHeader" {
-    printHeader(4, 1);
-    printHeader(32, 4);
-    printHeader(16, 2);
-}
-
 //alternative allocator
 //using GeneralPurposeAllocator. you can learn more about allocators in https://youtu.be/vHWiDx_l4V0
 
 // https://zig.news/xq/cool-zig-patterns-comptime-string-interning-3558
-fn internString(comptime str: []const u8) []const u8 {
-    return internStringBuffer(str.len, str[0..str.len].*);
-}
+//fn internString(comptime str: []const u8) []const u8 {
+//    return internStringBuffer(str.len, str[0..str.len].*);
+//}
 
-fn internStringBuffer(comptime len: comptime_int, comptime items: [len]u8) []const u8 {
-    comptime var storage: [len]u8 = items;
-    return &storage;
-}
+//fn internStringBuffer(comptime len: comptime_int, comptime items: [len]u8) []const u8 {
+//    comptime var storage: [len]u8 = items;
+//    return &storage;
+//}
