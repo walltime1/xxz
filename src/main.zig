@@ -71,15 +71,21 @@ pub fn main() !void {
 
     var bufRead = std.io.bufferedReader(in.reader());
 
+    var memBuf: [0xff]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&memBuf);
+    const memBufAll = fba.allocator();
+
     //var buffer: [1024]u8 = undefined;
-    const buffer = try allocator.alloc(u8, lineStop);
+    const buffer = try memBufAll.alloc(u8, lineStop);
+    defer memBufAll.free(buffer);
 
     var offset: i64 = 0;
 
     // main file read loop
     while (true) {
         // read into an array
-        const bytesRead = try bufRead.reader().readAtLeast(buffer, lineStop);
+        const bytesRead = try bufRead.reader().read(buffer);
+        if (bytesRead == 0) break;
 
         // print file content as a series of hexes
         // how we need to add N columns
@@ -91,8 +97,6 @@ pub fn main() !void {
         // possible printable characters
         try printHexdump(buffer[0..bytesRead], wordLength, offset);
         offset += @intCast(buffer.len);
-
-        if (bytesRead != lineStop) break;
     }
 
     // last read;
@@ -180,6 +184,18 @@ test "zero error test" {
 
 //alternative allocator
 //using GeneralPurposeAllocator. you can learn more about allocators in https://youtu.be/vHWiDx_l4V0
+
+test "fixed buffer allocator" {
+    var buffer: [1000]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&buffer);
+    const allocator = fba.allocator();
+
+    const memory = try allocator.alloc(u8, 100);
+    defer allocator.free(memory);
+
+    try testing.expect(memory.len == 100);
+    try testing.expect(@TypeOf(memory) == []u8);
+}
 
 // https://zig.news/xq/cool-zig-patterns-comptime-string-interning-3558
 //fn internString(comptime str: []const u8) []const u8 {
