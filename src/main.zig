@@ -31,7 +31,7 @@ pub fn main() !void {
         switch (param) {
             // find parameter -w to set the width.
             // if it is unset then use 16
-            .@"-w" => {
+            .@"-l" => {
                 if (i < args.len - 1) {
                     const tempRead = args[i + 1];
                     lineStop = std.fmt.parseUnsigned(u8, tempRead, 10) catch lineStop;
@@ -40,7 +40,7 @@ pub fn main() !void {
 
             // find parameter -l to set the word length.
             // if it is unset then use 1
-            .@"-l" => {
+            .@"-w" => {
                 if (i < args.len - 1) {
                     const tempRead: [:0]const u8 = args[i + 1];
                     wordLength = std.fmt.parseUnsigned(u8, tempRead, 10) catch wordLength;
