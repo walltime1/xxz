@@ -12,6 +12,8 @@ const argsError = error{
 
 const possibleParam = enum { @"-w", @"-l", @"-f" };
 pub fn main() !void {
+    const out = std.io.getStdOut().writer();
+
     // alloc buffer
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -71,13 +73,8 @@ pub fn main() !void {
 
     var bufRead = std.io.bufferedReader(in.reader());
 
-    var memBuf: [0xff]u8 = undefined;
-    var fba = std.heap.FixedBufferAllocator.init(&memBuf);
-    const memBufAll = fba.allocator();
-
-    //var buffer: [1024]u8 = undefined;
-    const buffer = try memBufAll.alloc(u8, lineStop);
-    defer memBufAll.free(buffer);
+    const buffer = try allocator.alloc(u8, lineStop);
+    defer allocator.free(buffer);
 
     var offset: i64 = 0;
 
@@ -95,7 +92,7 @@ pub fn main() !void {
         // in order to achieve true hexdump i need to
         // create a string and populate it with
         // possible printable characters
-        try printHexdump(buffer[0..bytesRead], wordLength, offset);
+        try printHexdump(buffer[0..bytesRead], lineStop, wordLength, offset, out);
         offset += @intCast(buffer.len);
     }
 
@@ -115,21 +112,29 @@ fn notZero(comptime numb: u8) !u8 {
     return zeroError.isZero;
 }
 
-fn printHexdump(buffer: []const u8, wordLength: u8, offset: i64) !void {
-    print("{x:0>8}: ", .{offset});
+fn printHexdump(buffer: []const u8, lineLen: u8, wordLength: u8, offset: i64, out: anytype) !void {
+    //const out = std.io.getStdOut().writer();
+
+    try out.print("{x:0>8}: ", .{offset});
+
+    const empty: [129]u8 = [_]u8{' '} ** 129;
 
     // variable for a printable string
     var printableStr: [0xff]u8 = undefined;
+    var whitespaces: u8 = lineLen / wordLength;
     // Print the hex values
     for (0..buffer.len) |i| {
         const byte = buffer[i];
-        print("{x:0>2}", .{byte});
+        try out.print("{x:0>2}", .{byte});
         printableStr[i] = printable(byte) catch '.';
-        if (i % wordLength == wordLength - 1) print(" ", .{});
+        if (i % wordLength == wordLength - 1) {
+            try out.print(" ", .{});
+            whitespaces -= 1;
+        }
     }
     //fill the gap if read less bytes than the buffer
-
-    print(" :{s}\n", .{printableStr[0..buffer.len]});
+    const wsCount = (lineLen - buffer.len) * 2 + (buffer.len % wordLength) + whitespaces;
+    try out.print("{s}:{s}\n", .{ empty[0..wsCount], printableStr[0..buffer.len] });
 }
 
 fn processExample1() void {}
