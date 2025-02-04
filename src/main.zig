@@ -1,6 +1,9 @@
 const std = @import("std");
 const testing = std.testing;
 const print = std.debug.print;
+const eql = std.mem.eql;
+const ArrayList = std.ArrayList;
+const test_allocator = std.testing.allocator;
 
 const printError = error{notPrintable};
 const zeroError = error{isZero};
@@ -79,6 +82,7 @@ pub fn main() !void {
     var offset: i64 = 0;
 
     // main file read loop
+
     while (true) {
         // read into an array
         const bytesRead = try bufRead.reader().read(buffer);
@@ -92,7 +96,8 @@ pub fn main() !void {
         // in order to achieve true hexdump i need to
         // create a string and populate it with
         // possible printable characters
-        try printHexdump(buffer[0..bytesRead], lineStop, wordLength, offset, out);
+
+        try printHexdump(buffer[0..bytesRead], lineStop, wordLength, offset, out, allocator);
         offset += @intCast(buffer.len);
     }
 
@@ -112,29 +117,28 @@ fn notZero(comptime numb: u8) !u8 {
     return zeroError.isZero;
 }
 
-fn printHexdump(buffer: []const u8, lineLen: u8, wordLength: u8, offset: i64, out: anytype) !void {
+fn printHexdump(buffer: []const u8, lineLen: u8, wordLength: u8, offset: i64, out: anytype, allocator: anytype) !void {
     //const out = std.io.getStdOut().writer();
 
-    try out.print("{x:0>8}: ", .{offset});
+    var list = ArrayList(u8).init(allocator);
+    defer list.deinit();
 
-    const empty: [129]u8 = [_]u8{' '} ** 129;
+    try out.print("{x:0>8}: ", .{offset});
+    _ = lineLen;
 
     // variable for a printable string
-    var printableStr: [0xff]u8 = undefined;
-    var whitespaces: u8 = lineLen / wordLength;
+    //var printableStr: [0xff]u8 = undefined;
     // Print the hex values
     for (0..buffer.len) |i| {
         const byte = buffer[i];
         try out.print("{x:0>2}", .{byte});
-        printableStr[i] = printable(byte) catch '.';
+        const printableChar = printable(byte) catch '.';
+        try list.append(printableChar);
         if (i % wordLength == wordLength - 1) {
             try out.print(" ", .{});
-            whitespaces -= 1;
         }
     }
-    //fill the gap if read less bytes than the buffer
-    const wsCount = (lineLen - buffer.len) * 2 + (buffer.len % wordLength) + whitespaces;
-    try out.print("{s}:{s}\n", .{ empty[0..wsCount], printableStr[0..buffer.len] });
+    try out.print(":{s}\n", .{try list.toOwnedSlice()});
 }
 
 fn processExample1() void {}
@@ -200,6 +204,19 @@ test "fixed buffer allocator" {
 
     try testing.expect(memory.len == 100);
     try testing.expect(@TypeOf(memory) == []u8);
+}
+
+test "arraylist" {
+    var list = ArrayList(u8).init(test_allocator);
+    defer list.deinit();
+    try list.append('H');
+    try list.append('e');
+    try list.append('l');
+    try list.append('l');
+    try list.append('o');
+    try list.appendSlice(" World!");
+
+    try testing.expect(eql(u8, list.items, "Hello World!"));
 }
 
 // https://zig.news/xq/cool-zig-patterns-comptime-string-interning-3558
